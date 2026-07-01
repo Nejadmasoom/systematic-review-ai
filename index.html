@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>دستیار رویوی سیستماتیک</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="#6366f1"/><path d="M7 14h14M14 7v14" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+        <span class="logo-text">SysReview AI</span>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle">✕</button>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-tab="strategy"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M3 5h12M3 9h12M3 13h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg> استراتژی جستجو</button>
+      <button class="nav-item" data-tab="screen"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M9 2l6 3.5v7L9 16l-6-3.5v-7L9 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 9l5-3M9 9v6M9 9L4 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg> غربال‌گری AI</button>
+      <button class="nav-item" data-tab="papers"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M4 2h7l4 4v9.5a.5.5 0 01-.5.5h-10a.5.5 0 01-.5-.5V2.5a.5.5 0 01.5-.5z" stroke="currentColor" stroke-width="1.5"/><path d="M11 2v4h4" stroke="currentColor" stroke-width="1.5"/></svg> مقالات <span class="nav-badge" id="papersBadge" style="display:none">0</span></button>
+      <button class="nav-item" data-tab="update"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2.5 9a6.5 6.5 0 0111.2-4.5M15.5 9a6.5 6.5 0 01-11.2 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13.5 2v3h-3M4.5 16v-3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> آپدیت دوره‌ای</button>
+      <button class="nav-item" data-tab="export"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M9 2v9M5.5 7.5L9 11l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14.5h12v1.5H3z" fill="currentColor"/></svg> خروجی</button>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="nav-item" data-tab="settings"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="2.3" stroke="currentColor" stroke-width="1.4"/><path d="M9 1.5v2M9 14.5v2M2.6 5l1.7 1M13.7 12l1.7 1M2.6 13l1.7-1M13.7 6l1.7-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg> تنظیمات API</button>
+      <div class="token-mini" id="tokenMini" style="display:none">
+        <div class="token-mini-label">توکن مصرفی</div>
+        <div class="token-mini-val" id="tokenMiniVal">۰</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="topbar">
+      <button class="menu-btn" id="menuBtn">☰</button>
+      <div class="topbar-title" id="topbarTitle">استراتژی جستجو</div>
+      <div class="model-indicator" id="modelIndicator">
+        <span class="model-dot"></span>
+        <span id="modelIndicatorText">مدل انتخاب نشده</span>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="tab-panel" id="tab-settings">
+      <div class="panel-header">
+        <h1>تنظیمات API</h1>
+        <p>کلید API و مدل مورد نظر را انتخاب کنید</p>
+      </div>
+      <div class="provider-grid">
+        <div class="provider-card" data-provider="openai">
+          <div class="provider-head">
+            <div class="provider-icon openai-icon">🤖</div>
+            <div>
+              <div class="provider-name">OpenAI / ChatGPT</div>
+              <div class="provider-sub">GPT-4o، Claude، Gemini از طریق OpenAI API</div>
+            </div>
+            <div class="provider-status" id="statusOpenai"></div>
+          </div>
+          <div class="field-group">
+            <label>کلید API</label>
+            <div class="input-with-btn">
+              <input type="password" id="keyOpenai" placeholder="sk-..." autocomplete="off">
+              <button class="eye-btn" onclick="toggleKey('keyOpenai')"><svg viewBox="0 0 18 18" fill="none" style="width:15px;height:15px"><path d="M1.5 9S4 3.5 9 3.5 16.5 9 16.5 9 14 14.5 9 14.5 1.5 9 1.5 9z" stroke="currentColor" stroke-width="1.3"/><circle cx="9" cy="9" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg></button>
+            </div>
+          </div>
+          <div class="field-group">
+            <label>آدرس Base URL (اختیاری — برای پروکسی یا OpenRouter)</label>
+            <input type="text" id="baseOpenai" placeholder="https://api.openai.com/v1">
+          </div>
+          <div class="field-group">
+            <label>انتخاب مدل</label>
+            <div class="model-list" id="modelsOpenai"></div>
+          </div>
+          <button class="btn-test" onclick="testConnection('openai')">تست اتصال</button>
+        </div>
+
+        <div class="provider-card" data-provider="gemini">
+          <div class="provider-head">
+            <div class="provider-icon gemini-icon">✨</div>
+            <div>
+              <div class="provider-name">Google Gemini</div>
+              <div class="provider-sub">AI Studio — رایگان با محدودیت</div>
+            </div>
+            <div class="provider-status" id="statusGemini"></div>
+          </div>
+          <div class="field-group">
+            <label>کلید API (از aistudio.google.com)</label>
+            <div class="input-with-btn">
+              <input type="password" id="keyGemini" placeholder="AIza..." autocomplete="off">
+              <button class="eye-btn" onclick="toggleKey('keyGemini')"><svg viewBox="0 0 18 18" fill="none" style="width:15px;height:15px"><path d="M1.5 9S4 3.5 9 3.5 16.5 9 16.5 9 14 14.5 9 14.5 1.5 9 1.5 9z" stroke="currentColor" stroke-width="1.3"/><circle cx="9" cy="9" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg></button>
+            </div>
+          </div>
+          <div class="field-group">
+            <label>انتخاب مدل</label>
+            <div class="model-list" id="modelsGemini"></div>
+          </div>
+          <button class="btn-test" onclick="testConnection('gemini')">تست اتصال</button>
+        </div>
+
+        <div class="provider-card" data-provider="groq">
+          <div class="provider-head">
+            <div class="provider-icon groq-icon">⚡</div>
+            <div>
+              <div class="provider-name">Groq</div>
+              <div class="provider-sub">رایگان — سرعت بسیار بالا</div>
+            </div>
+            <div class="provider-status" id="statusGroq"></div>
+          </div>
+          <div class="field-group">
+            <label>کلید API (از console.groq.com)</label>
+            <div class="input-with-btn">
+              <input type="password" id="keyGroq" placeholder="gsk_..." autocomplete="off">
+              <button class="eye-btn" onclick="toggleKey('keyGroq')"><svg viewBox="0 0 18 18" fill="none" style="width:15px;height:15px"><path d="M1.5 9S4 3.5 9 3.5 16.5 9 16.5 9 14 14.5 9 14.5 1.5 9 1.5 9z" stroke="currentColor" stroke-width="1.3"/><circle cx="9" cy="9" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg></button>
+            </div>
+          </div>
+          <div class="field-group">
+            <label>انتخاب مدل</label>
+            <div class="model-list" id="modelsGroq"></div>
+          </div>
+          <button class="btn-test" onclick="testConnection('groq')">تست اتصال</button>
+        </div>
+      </div>
+
+      <div class="token-panel">
+        <div class="token-panel-header">
+          <h3>لاگ مصرف توکن</h3>
+          <button class="btn-sm" onclick="clearTokenLog()">پاک کردن</button>
+        </div>
+        <div class="token-stats">
+          <div class="token-stat"><div class="ts-val" id="tsInput">۰</div><div class="ts-label">توکن ورودی</div></div>
+          <div class="token-stat"><div class="ts-val" id="tsOutput">۰</div><div class="ts-label">توکن خروجی</div></div>
+          <div class="token-stat"><div class="ts-val" id="tsTotal">۰</div><div class="ts-label">کل توکن</div></div>
+          <div class="token-stat"><div class="ts-val" id="tsCalls">۰</div><div class="ts-label">تعداد درخواست</div></div>
+        </div>
+        <div class="token-log" id="tokenLog"><div class="log-empty">هنوز درخواستی ارسال نشده</div></div>
+      </div>
+    </div>
+
+    <!-- Strategy -->
+    <div class="tab-panel active" id="tab-strategy">
+      <div id="onboardingBanner"></div>
+      <div class="panel-header">
+        <h1>استراتژی جستجو</h1>
+        <p>سرچ استراتژی دیتابیس‌های مختلف را وارد کنید — AI به‌صورت خودکار parse می‌کند</p>
+      </div>
+      <div class="strategy-grid">
+        <div class="strategy-import-card">
+          <div class="card-title"><svg class="ti-icon" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 12.5h10v1.5H3z" fill="currentColor"/></svg> وارد کردن سرچ استراتژی</div>
+          <div class="db-tabs">
+            <button class="db-tab active" data-db="pubmed">PubMed</button>
+            <button class="db-tab" data-db="scopus">Scopus</button>
+            <button class="db-tab" data-db="wos">Web of Science</button>
+            <button class="db-tab" data-db="embase">Embase</button>
+            <button class="db-tab" data-db="custom">سفارشی</button>
+          </div>
+          <textarea class="strategy-input" id="strategyInput" placeholder="سرچ استراتژی خود را اینجا paste کنید...
+
+مثال PubMed:
+(neuroplasticity[MeSH] OR &quot;brain plasticity&quot;[tw]) AND (depression[MeSH] OR MDD[tw]) AND (&quot;randomized controlled trial&quot;[pt])
+
+مثال Scopus:
+TITLE-ABS-KEY(neuroplasticity OR &quot;brain plasticity&quot;) AND TITLE-ABS-KEY(depression OR MDD) AND DOCTYPE(ar)"></textarea>
+          <div class="strategy-actions">
+            <button class="btn-primary" onclick="parseStrategy()">Parse با AI</button>
+            <button class="btn-ghost" onclick="clearStrategy()">پاک کردن</button>
+          </div>
+          <div class="parse-result" id="parseResult" style="display:none"></div>
+        </div>
+
+        <div class="strategy-form-card">
+          <div class="card-title"><svg class="ti-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg> چارچوب PICO / PECO</div>
+          <p class="pico-hint">معیارهای ورود را بر اساس چارچوب استاندارد سیستماتیک رویو مشخص کنید — این فیلدها مستقیماً به معیارهای ورود تبدیل می‌شوند و دقت غربال‌گری AI را بالا می‌برند.</p>
+
+          <div class="pico-grid">
+            <div class="pico-field">
+              <label><span class="pico-letter">P</span> جمعیت (Population)</label>
+              <input type="text" id="picoP" placeholder="مثال: بیماران بزرگسال مبتلا به افسردگی اساسی">
+            </div>
+            <div class="pico-field">
+              <label><span class="pico-letter">I</span> مداخله / مواجهه (Intervention/Exposure)</label>
+              <input type="text" id="picoI" placeholder="مثال: تحریک مغناطیسی فراجمجمه‌ای (rTMS)">
+            </div>
+            <div class="pico-field">
+              <label><span class="pico-letter">C</span> مقایسه (Comparison) — اختیاری</label>
+              <input type="text" id="picoC" placeholder="مثال: دارونما یا درمان استاندارد">
+            </div>
+            <div class="pico-field">
+              <label><span class="pico-letter">O</span> پیامد (Outcome)</label>
+              <input type="text" id="picoO" placeholder="مثال: تغییر نمره HAM-D">
+            </div>
+          </div>
+
+          <div class="field-group" style="margin-top:10px">
+            <label>نوع‌های مطالعه مجاز</label>
+            <div class="lang-chips" id="studyDesignChips">
+              <div class="chip active" onclick="toggleChip(this)">RCT</div>
+              <div class="chip" onclick="toggleChip(this)">Cohort</div>
+              <div class="chip" onclick="toggleChip(this)">Case-control</div>
+              <div class="chip" onclick="toggleChip(this)">Cross-sectional</div>
+              <div class="chip" onclick="toggleChip(this)">Systematic Review</div>
+              <div class="chip" onclick="toggleChip(this)">Case report</div>
+            </div>
+          </div>
+
+          <details class="advanced-criteria">
+            <summary>معیارهای سفارشی پیشرفته (اختیاری)</summary>
+            <div class="criteria-section" style="margin-top:10px">
+              <div class="criteria-label inclusion">✓ معیار ورود اضافه</div>
+              <div class="criteria-fields" id="inclusionFields"></div>
+              <button class="btn-add-criteria" onclick="addCriteria('inclusion')">+ افزودن</button>
+            </div>
+            <div class="criteria-section" style="margin-top:14px">
+              <div class="criteria-label exclusion">✗ معیار خروج اضافه</div>
+              <div class="criteria-fields" id="exclusionFields">
+                <div class="criteria-row">
+                  <select class="criteria-type"><option value="study_type">نوع مطالعه</option><option value="population">جمعیت</option><option value="language">زبان</option><option value="year">سال</option><option value="custom">سفارشی</option></select>
+                  <input type="text" class="criteria-value" placeholder="مثال: مطالعات حیوانی">
+                  <button class="criteria-remove" onclick="removeCriteria(this)">×</button>
+                </div>
+              </div>
+              <button class="btn-add-criteria" onclick="addCriteria('exclusion')">+ افزودن</button>
+            </div>
+          </details>
+
+          <div class="field-group" style="margin-top:14px">
+            <label>بازه زمانی</label>
+            <div class="year-range">
+              <input type="number" id="yearFrom" placeholder="از سال" min="1900" max="2030">
+              <span>تا</span>
+              <input type="number" id="yearTo" placeholder="تا سال" min="1900" max="2030">
+            </div>
+          </div>
+          <div class="field-group">
+            <label>زبان‌های مجاز</label>
+            <div class="lang-chips">
+              <div class="chip active" onclick="toggleChip(this)">English</div>
+              <div class="chip" onclick="toggleChip(this)">Persian</div>
+              <div class="chip" onclick="toggleChip(this)">German</div>
+              <div class="chip" onclick="toggleChip(this)">French</div>
+              <div class="chip" onclick="toggleChip(this)">Arabic</div>
+            </div>
+          </div>
+          <button class="btn-primary" style="width:100%;margin-top:10px" onclick="saveStrategy()">ذخیره استراتژی</button>
+        </div>
+      </div>
+      <div class="parsed-keywords" id="parsedKeywords" style="display:none">
+        <div class="card-title">کلیدواژه‌های استخراج‌شده</div>
+        <div class="kw-groups" id="kwGroups"></div>
+      </div>
+    </div>
+
+    <!-- Screening -->
+    <div class="tab-panel" id="tab-screen">
+      <div class="panel-header">
+        <h1>غربال‌گری با AI</h1>
+        <p>یک مقاله را بررسی کنید یا چند مقاله را یک‌جا وارد و غربال کنید</p>
+      </div>
+      <div class="screen-layout">
+        <div class="screen-input-card">
+          <div class="card-title">بررسی تکی مقاله</div>
+          <div class="field-group">
+            <label>عنوان مقاله *</label>
+            <input type="text" id="screenTitle" placeholder="عنوان کامل مقاله">
+          </div>
+          <div class="field-group">
+            <label>چکیده (Abstract)</label>
+            <textarea id="screenAbstract" rows="5" placeholder="چکیده مقاله را paste کنید..."></textarea>
+          </div>
+          <div class="screen-meta">
+            <div class="field-group"><label>نویسنده</label><input type="text" id="screenAuthor" placeholder="Author et al."></div>
+            <div class="field-group"><label>DOI</label><input type="text" id="screenDoi" placeholder="10.xxxx/xxxxx"></div>
+            <div class="field-group"><label>سال</label><input type="number" id="screenYear" placeholder="2024"></div>
+            <div class="field-group"><label>مجله</label><input type="text" id="screenJournal" placeholder="نام مجله"></div>
+          </div>
+          <div class="screen-btns" style="margin-top:12px">
+            <button class="btn-primary" onclick="screenPaper()">غربال با AI</button>
+            <button class="btn-ghost" onclick="addManual()">افزودن بدون غربال</button>
+          </div>
+        </div>
+        <div class="screen-result-card">
+          <div class="card-title">نتیجه غربال‌گری</div>
+          <div class="result-placeholder" id="resultPlaceholder">
+            <svg viewBox="0 0 48 48" fill="none" style="width:40px;height:40px;opacity:.35;margin-bottom:8px"><circle cx="22" cy="22" r="14" stroke="currentColor" stroke-width="2.5"/><path d="M32 32l10 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+            <p>منتظر غربال‌گری...</p>
+          </div>
+          <div class="result-content" id="resultContent" style="display:none"></div>
+        </div>
+      </div>
+
+      <div class="batch-card">
+        <div class="card-title">ورود و غربال‌گری دسته‌ای</div>
+        <p class="pico-hint">خروجی Zotero / EndNote / PubMed / Scopus را به‌صورت <strong>RIS</strong> یا <strong>BibTeX</strong> دانلود کرده و اینجا آپلود یا paste کنید — فرمت به‌طور خودکار تشخیص داده می‌شود.</p>
+
+        <div class="batch-import-row">
+          <label class="file-drop" for="fileImport">
+            <svg viewBox="0 0 24 24" fill="none" style="width:22px;height:22px"><path d="M12 4v11M7.5 11l4.5 4.5L16.5 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 17.5v2a1.5 1.5 0 001.5 1.5h11a1.5 1.5 0 001.5-1.5v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <span>فایل .ris / .bib / .csv را اینجا انتخاب کنید</span>
+            <input type="file" id="fileImport" accept=".ris,.bib,.bibtex,.csv,.txt" style="display:none" onchange="handleFileImport(event)">
+          </label>
+        </div>
+        <textarea id="batchInput" rows="4" placeholder="یا مستقیماً محتوای RIS / BibTeX / CSV را اینجا paste کنید..."></textarea>
+        <div class="batch-actions">
+          <button class="btn-primary" onclick="parseBatch()">وارد کردن مقالات</button>
+          <span id="batchFormatBadge" class="format-badge" style="display:none"></span>
+        </div>
+
+        <div class="batch-screen-section">
+          <div class="batch-screen-row">
+            <div>
+              <div style="font-size:13px;font-weight:600">غربال‌گری خودکار موارد غربال‌نشده</div>
+              <div style="font-size:12px;color:var(--text3)" id="unscreenedCount">۰ مقاله در انتظار غربال‌گری</div>
+            </div>
+            <button class="btn-primary" onclick="batchScreenAll()" id="batchScreenBtn">شروع غربال‌گری دسته‌ای</button>
+          </div>
+          <div class="batch-progress" id="batchProgress" style="display:none">
+            <div class="batch-progress-bar"><div class="batch-progress-fill" id="batchProgressFill"></div></div>
+            <div class="batch-progress-text" id="batchProgressText"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Papers -->
+    <div class="tab-panel" id="tab-papers">
+      <div class="panel-header">
+        <h1>مدیریت مقالات</h1>
+        <div class="paper-stats" id="paperStats"></div>
+      </div>
+      <div class="papers-toolbar">
+        <input type="text" id="paperSearch" placeholder="جستجو..." oninput="renderPapers()" style="flex:1">
+        <select id="paperFilter" onchange="renderPapers()">
+          <option value="all">همه</option>
+          <option value="included">شامل شده</option>
+          <option value="excluded">خارج شده</option>
+          <option value="pending">در بررسی</option>
+          <option value="unscreened">غربال نشده</option>
+        </select>
+        <button class="btn-ghost btn-sm" onclick="exportCSV()">خروجی CSV</button>
+      </div>
+      <div class="papers-table-wrap">
+        <table class="papers-table">
+          <thead><tr><th>عنوان</th><th>نویسنده</th><th>سال</th><th>وضعیت</th><th>دلیل AI</th><th>عملیات</th></tr></thead>
+          <tbody id="papersBody"></tbody>
+        </table>
+        <div class="papers-empty" id="papersEmpty">
+          <svg viewBox="0 0 48 48" fill="none" style="width:40px;height:40px;opacity:.35"><path d="M8 4h24l8 8v32H8V4z" stroke="currentColor" stroke-width="2"/><path d="M32 4v8h8M16 22h16M16 30h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <p>هنوز مقاله‌ای وارد نشده</p>
+          <button class="btn-ghost btn-sm" style="margin-top:10px" onclick="switchTab('screen')">رفتن به وارد کردن مقالات ←</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Update -->
+    <div class="tab-panel" id="tab-update">
+      <div class="panel-header"><h1>آپدیت دوره‌ای</h1><p>لینک‌های آماده جستجو بر اساس استراتژی ذخیره‌شده</p></div>
+      <div class="update-grid">
+        <div class="update-card">
+          <div class="card-title">📅 آخرین جستجو</div>
+          <input type="date" id="lastSearchDate" style="width:100%;margin-bottom:8px">
+          <button class="btn-ghost" style="width:100%" onclick="setToday()">ثبت امروز</button>
+          <div class="last-search-info" id="lastSearchInfo"></div>
+        </div>
+        <div class="update-card"><div class="card-title">🔗 لینک‌های جستجو</div><div id="searchLinks"></div></div>
+        <div class="update-card"><div class="card-title">✅ چک‌لیست آپدیت</div><div id="updateChecklist"></div></div>
+      </div>
+    </div>
+
+    <!-- Export -->
+    <div class="tab-panel" id="tab-export">
+      <div class="panel-header"><h1>خروجی گزارش</h1></div>
+      <div class="export-grid">
+        <div class="export-card">
+          <div class="card-title">گزارش PRISMA</div>
+          <div class="prisma-flow" id="prismaFlow"></div>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <button class="btn-primary" onclick="copyReport()">کپی گزارش</button>
+            <button class="btn-ghost" onclick="downloadPrismaSVG()">دانلود نمودار SVG</button>
+            <button class="btn-ghost" onclick="exportCSV()">CSV</button>
+            <button class="btn-ghost" onclick="exportRIS()">RIS (برای Zotero/EndNote)</button>
+          </div>
+        </div>
+        <div class="export-card">
+          <div class="card-title">استراتژی جستجو (برای درج در مقاله)</div>
+          <div class="strategy-report" id="strategyReport"></div>
+          <button class="btn-ghost" style="margin-top:8px" onclick="copyStrategy()">کپی</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+<script src="js/models.js"></script>
+<script src="js/parsers.js"></script>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
