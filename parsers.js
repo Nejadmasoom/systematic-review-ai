@@ -185,6 +185,7 @@ function papersToRIS(papers) {
     if (p.doi) lines.push(`DO  - ${p.doi}`);
     if (p.abstract) lines.push(`AB  - ${p.abstract}`);
     if (p.sourceUrl) lines.push(`UR  - ${p.sourceUrl}`);
+    if (p.fullTextUrl) lines.push(`L1  - ${p.fullTextUrl}`);
     if (p.source) lines.push(`DB  - ${p.source}`);
     const statusLabels = { included: 'Included', excluded: 'Excluded', pending: 'Pending review', unscreened: 'Not screened' };
     const noteBits = [`Screening status: ${statusLabels[p.status] || p.status}`];

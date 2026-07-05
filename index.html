@@ -429,6 +429,12 @@ TITLE-ABS-KEY(neuroplasticity OR &quot;brain plasticity&quot;) AND TITLE-ABS-KEY
           </div>
         </div>
         <div class="export-card">
+          <div class="card-title">🔓 پیدا کردن متن‌کامل رایگان (Open Access)</div>
+          <p style="font-size:12.5px;color:var(--text3);margin-bottom:10px">این ابزار فقط عنوان/چکیده را غربال می‌کند — برای مرحله‌ی eligibility باید متن کامل را بخوانید. با Unpaywall (رایگان، بدون کلید)، برای هر مقاله‌ی «شامل‌شده» که DOI دارد، لینک نسخه‌ی باز/رایگان (اگر در مخزن دانشگاهی یا ژورنال open-access موجود باشد) پیدا می‌شود.</p>
+          <button class="btn-primary" style="width:100%" onclick="runFullTextLookup()" id="fullTextBtn">🔓 پیدا کردن PDF برای مقالات شامل‌شده</button>
+          <div id="fullTextStatus" class="parse-result" style="display:none;margin-top:10px"></div>
+        </div>
+        <div class="export-card">
           <div class="card-title">🔗 گسترش با Snowballing (استناددهی)</div>
           <p style="font-size:12.5px;color:var(--text3);margin-bottom:10px">برای هر مقاله «شامل‌شده»، مقالاتی که به آن استناد کرده‌اند یا در منابعش هستند را از OpenAlex پیدا کن و به‌عنوان کاندید جدید اضافه کن — روش استاندارد Cochrane برای افزایش پوشش جستجو.</p>
           <button class="btn-primary" style="width:100%" onclick="runSnowballing()" id="snowballBtn">🔗 اجرای Snowballing روی مقالات شامل‌شده</button>

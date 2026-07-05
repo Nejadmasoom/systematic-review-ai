@@ -345,6 +345,77 @@ async function runSnowballing() {
   }
 }
 
+// ===== Unpaywall — پیدا کردن نسخه‌ی متن‌کامل رایگان/باز (Open Access) برای مقالات دارای DOI =====
+// این ابزار فقط عنوان/چکیده را غربال می‌کند؛ برای مرحله‌ی eligibility (که باید روی متن کامل انجام شود)
+// پژوهشگر به لینک PDF نیاز دارد. Unpaywall رایگان است، کلید نمی‌خواهد و بیش از ۵۰٬۰۰۰ ناشر/مخزن را
+// پوشش می‌دهد (شامل نسخه‌های آرشیوشده در مخازن دانشگاهی حتی برای مقالات ناشر پولی).
+async function findOpenAccessPdf(doi) {
+  const cleanDoi = (doi || '').replace(/^https?:\/\/(dx\.)?doi\.org\//, '').trim();
+  if (!cleanDoi) return { found: false, reason: 'این مقاله DOI ندارد' };
+
+  try {
+    const resp = await fetch(`https://api.unpaywall.org/v2/${encodeURIComponent(cleanDoi)}?email=systematicreview.tool@gmail.com`);
+    if (!resp.ok) return { found: false, reason: `خطای Unpaywall (HTTP ${resp.status})` };
+    const data = await resp.json();
+    if (!data.is_oa || !data.best_oa_location) {
+      return { found: false, reason: 'نسخه‌ی باز/رایگان برای این مقاله پیدا نشد (احتمالاً فقط نسخه‌ی پولی ناشر موجود است)' };
+    }
+    const loc = data.best_oa_location;
+    return {
+      found: true,
+      url: loc.url_for_pdf || loc.url,
+      isPdf: !!loc.url_for_pdf,
+      hostType: loc.host_type, // 'publisher' | 'repository'
+      oaStatus: data.oa_status // gold, green, hybrid, bronze, ...
+    };
+  } catch (err) {
+    return { found: false, reason: `خطا در اتصال به Unpaywall: ${err.message}` };
+  }
+}
+
+// جستجوی دسته‌ای متن‌کامل برای همه‌ی مقالات «شامل‌شده» (یا هر لیستی که داده شود)
+async function findFullTextForPapers(papers, onProgress) {
+  let found = 0, notFound = 0;
+  for (let i = 0; i < papers.length; i++) {
+    const p = papers[i];
+    if (onProgress) onProgress(i + 1, papers.length, p.title);
+    if (!p.doi) { notFound++; continue; }
+    const result = await findOpenAccessPdf(p.doi);
+    if (result.found) {
+      p.fullTextUrl = result.url;
+      p.oaStatus = result.oaStatus;
+      found++;
+    } else {
+      p.fullTextNote = result.reason;
+      notFound++;
+    }
+    if (i < papers.length - 1) await new Promise(r => setTimeout(r, 250)); // ادب در برابر API رایگان
+  }
+  saveToStorage();
+  return { found, notFound };
+}
+
+async function runFullTextLookup() {
+  const included = STATE.papers.filter(p => p.status === 'included');
+  if (!included.length) {
+    showToast('⚠ هیچ مقاله‌ی شامل‌شده‌ای وجود ندارد', 'error');
+    return;
+  }
+  const btn = document.getElementById('fullTextBtn');
+  const statusEl = document.getElementById('fullTextStatus');
+  btn.disabled = true;
+  statusEl.style.display = 'block';
+
+  const { found, notFound } = await findFullTextForPapers(included, (i, total, title) => {
+    statusEl.textContent = `⏳ (${i}/${total}) در حال جستجوی PDF برای: ${title.slice(0, 50)}...`;
+  });
+
+  statusEl.textContent = `✅ تمام شد — ${found} مقاله متن‌کامل رایگان دارند | ${notFound} مقاله پیدا نشد (احتمالاً پولی هستند یا DOI ندارند)`;
+  btn.disabled = false;
+  if (typeof renderPapers === 'function') renderPapers();
+  showToast(`✅ ${found} لینک متن‌کامل رایگان پیدا شد`, found > 0 ? 'success' : 'error');
+}
+
 function escapeHtmlAS(s) {
   return (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

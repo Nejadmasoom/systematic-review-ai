@@ -575,7 +575,7 @@ function renderPapers() {
     tbody.innerHTML = filtered.map(p => `
       <tr>
         <td class="paper-title-cell">
-          <div class="title" title="کلیک برای مشاهده جزئیات کامل" style="cursor:pointer" onclick="openPaperDetail(${p.id})">${p.title}${p.source ? `<span class="source-badge">${p.source}</span>` : ''}</div>
+          <div class="title" title="کلیک برای مشاهده جزئیات کامل" style="cursor:pointer" onclick="openPaperDetail(${p.id})">${p.title}${p.source ? `<span class="source-badge">${p.source}</span>` : ''}${p.fullTextUrl ? `<span class="source-badge" style="background:var(--green-bg);color:var(--green)">🔓 OA</span>` : ''}</div>
           ${p.doi ? `<div class="doi">${p.doi}</div>` : ''}
         </td>
         <td>${p.author || '—'}</td>
@@ -685,6 +685,14 @@ function openPaperDetail(id) {
 
     ${p.sourceUrl ? `<div class="modal-section"><a href="${p.sourceUrl}" target="_blank" rel="noopener" style="color:var(--accent2);font-size:13px">مشاهده مقاله اصلی ↗</a></div>` : ''}
 
+    <div class="modal-section" id="fullTextSection-${p.id}">
+      ${p.fullTextUrl
+        ? `<a href="${p.fullTextUrl}" target="_blank" rel="noopener" class="btn-primary" style="display:inline-block;text-decoration:none">🔓 باز کردن متن‌کامل رایگان (${p.oaStatus || 'OA'}) ↗</a>`
+        : `<button class="btn-ghost" onclick="lookupSinglePaperFullText(${p.id})">🔓 جستجوی متن‌کامل رایگان (Unpaywall)</button>
+           ${p.fullTextNote ? `<div style="font-size:11.5px;color:var(--text3);margin-top:6px">${p.fullTextNote}</div>` : ''}`
+      }
+    </div>
+
     ${r ? `
     <div class="modal-section">
       <div class="modal-section-title">نتیجه غربال‌گری AI</div>
@@ -712,6 +720,27 @@ function openPaperDetail(id) {
 
 function closePaperDetail() {
   document.getElementById('paperDetailModal').style.display = 'none';
+}
+
+async function lookupSinglePaperFullText(id) {
+  const p = STATE.papers.find(x => x.id === id);
+  if (!p) return;
+  const section = document.getElementById(`fullTextSection-${p.id}`);
+  if (section) section.innerHTML = '<span class="spinner" style="width:16px;height:16px"></span> در حال جستجو در Unpaywall...';
+
+  const result = await findOpenAccessPdf(p.doi);
+  if (result.found) {
+    p.fullTextUrl = result.url;
+    p.oaStatus = result.oaStatus;
+  } else {
+    p.fullTextNote = result.reason;
+  }
+  saveToStorage();
+  if (section) {
+    section.innerHTML = p.fullTextUrl
+      ? `<a href="${p.fullTextUrl}" target="_blank" rel="noopener" class="btn-primary" style="display:inline-block;text-decoration:none">🔓 باز کردن متن‌کامل رایگان (${p.oaStatus || 'OA'}) ↗</a>`
+      : `<button class="btn-ghost" onclick="lookupSinglePaperFullText(${p.id})">🔓 جستجوی متن‌کامل رایگان (Unpaywall)</button><div style="font-size:11.5px;color:var(--text3);margin-top:6px">${p.fullTextNote}</div>`;
+  }
 }
 
 // ===== Update Tab =====
@@ -1051,6 +1080,7 @@ function exportExcel() {
     'استدلال کامل AI': p.aiResult?.reasoning || '',
     'چکیده': p.abstract || '',
     'لینک': p.sourceUrl || '',
+    'PDF متن‌کامل رایگان': p.fullTextUrl || '',
     'تاریخ افزوده‌شدن': p.addedAt ? new Date(p.addedAt).toLocaleDateString('fa-IR') : ''
   });
 
@@ -1058,7 +1088,7 @@ function exportExcel() {
 
   // شیت ۱: همه مقالات
   const wsAll = XLSX.utils.json_to_sheet(STATE.papers.map(rowOf));
-  wsAll['!cols'] = [{ wch: 45 }, { wch: 18 }, { wch: 8 }, { wch: 22 }, { wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 35 }, { wch: 45 }, { wch: 50 }, { wch: 25 }, { wch: 14 }];
+  wsAll['!cols'] = [{ wch: 45 }, { wch: 18 }, { wch: 8 }, { wch: 22 }, { wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 35 }, { wch: 45 }, { wch: 50 }, { wch: 25 }, { wch: 25 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, wsAll, 'همه مقالات');
 
   // شیت‌های تفکیکی بر اساس وضعیت
