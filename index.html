@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="app-layout">
@@ -74,7 +75,7 @@
             <input type="text" id="baseOpenai" placeholder="https://api.openai.com/v1">
           </div>
           <div class="field-group">
-            <label>انتخاب مدل</label>
+            <label>انتخاب مدل <button class="refresh-models-btn" id="refreshModelsOpenai" onclick="refreshModelsFromServer('openai')">🔄 بررسی زنده لیست مدل‌ها از سرور</button></label>
             <div class="model-list" id="modelsOpenai"></div>
           </div>
           <button class="btn-test" onclick="testConnection('openai')">تست اتصال</button>
@@ -97,7 +98,7 @@
             </div>
           </div>
           <div class="field-group">
-            <label>انتخاب مدل</label>
+            <label>انتخاب مدل <button class="refresh-models-btn" id="refreshModelsGemini" onclick="refreshModelsFromServer('gemini')">🔄 بررسی زنده لیست مدل‌ها از سرور</button></label>
             <div class="model-list" id="modelsGemini"></div>
           </div>
           <button class="btn-test" onclick="testConnection('gemini')">تست اتصال</button>
@@ -120,7 +121,7 @@
             </div>
           </div>
           <div class="field-group">
-            <label>انتخاب مدل</label>
+            <label>انتخاب مدل <button class="refresh-models-btn" id="refreshModelsGroq" onclick="refreshModelsFromServer('groq')">🔄 بررسی زنده لیست مدل‌ها از سرور</button></label>
             <div class="model-list" id="modelsGroq"></div>
           </div>
           <button class="btn-test" onclick="testConnection('groq')">تست اتصال</button>
@@ -171,6 +172,10 @@
             <div class="chip" onclick="document.getElementById('asYearFrom').value=new Date().getFullYear()-1; document.getElementById('asYearTo').value=new Date().getFullYear();">فقط یک سال اخیر</div>
             <div class="chip" onclick="document.getElementById('asYearFrom').value=new Date().getFullYear()-5; document.getElementById('asYearTo').value=new Date().getFullYear();">۵ سال اخیر</div>
           </div>
+        </div>
+        <div class="field-group">
+          <label>🎯 چک Recall با مقالات شناخته‌شده (اختیاری ولی قویاً پیشنهادی)</label>
+          <textarea class="strategy-input" id="asKnownDois" style="min-height:55px" placeholder="اگر از قبل ۱ تا ۵ مقاله می‌شناسید که حتماً باید در نتایج باشند، DOI هرکدام را در یک خط وارد کنید. بعد از جستجو، تک‌تک چک می‌شود که آیا استراتژی شما واقعاً آن‌ها را پیدا کرده یا نه — روش استاندارد «relative recall» برای اعتبارسنجی سرچ استراتژی."></textarea>
         </div>
         <button class="btn-primary" id="asPlanBtn" style="width:100%;margin-top:6px" onclick="generateSearchPlan()">🧠 پیشنهاد PICO و استراتژی با AI</button>
       </div>
@@ -417,9 +422,17 @@ TITLE-ABS-KEY(neuroplasticity OR &quot;brain plasticity&quot;) AND TITLE-ABS-KEY
           <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
             <button class="btn-primary" onclick="copyReport()">کپی گزارش</button>
             <button class="btn-ghost" onclick="downloadPrismaSVG()">دانلود نمودار SVG</button>
+            <button class="btn-ghost" onclick="exportExcel()">📊 Excel (.xlsx)</button>
             <button class="btn-ghost" onclick="exportCSV()">CSV</button>
             <button class="btn-ghost" onclick="exportRIS()">RIS (برای Zotero/EndNote)</button>
+            <button class="btn-ghost" onclick="exportBibTeX()">BibTeX</button>
           </div>
+        </div>
+        <div class="export-card">
+          <div class="card-title">🔗 گسترش با Snowballing (استناددهی)</div>
+          <p style="font-size:12.5px;color:var(--text3);margin-bottom:10px">برای هر مقاله «شامل‌شده»، مقالاتی که به آن استناد کرده‌اند یا در منابعش هستند را از OpenAlex پیدا کن و به‌عنوان کاندید جدید اضافه کن — روش استاندارد Cochrane برای افزایش پوشش جستجو.</p>
+          <button class="btn-primary" style="width:100%" onclick="runSnowballing()" id="snowballBtn">🔗 اجرای Snowballing روی مقالات شامل‌شده</button>
+          <div id="snowballStatus" class="parse-result" style="display:none;margin-top:10px"></div>
         </div>
         <div class="export-card">
           <div class="card-title">استراتژی جستجو (برای درج در مقاله)</div>
@@ -430,6 +443,12 @@ TITLE-ABS-KEY(neuroplasticity OR &quot;brain plasticity&quot;) AND TITLE-ABS-KEY
     </div>
 
   </main>
+</div>
+<div class="modal-overlay" id="paperDetailModal" style="display:none" onclick="if(event.target===this) closePaperDetail()">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closePaperDetail()">✕</button>
+    <div id="paperDetailContent"></div>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
 <script src="js/models.js"></script>
