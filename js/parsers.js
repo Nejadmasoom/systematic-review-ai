@@ -174,7 +174,7 @@ function checkDuplicate(paper, existingPapers) {
   return { isDupe: false, isFuzzy: false, match: null };
 }
 
-// ===== خروجی RIS =====
+// ===== خروجی RIS (غنی‌شده — شامل وضعیت غربال‌گری، استدلال AI، لینک و منبع) =====
 function papersToRIS(papers) {
   return papers.map(p => {
     const lines = ['TY  - JOUR'];
@@ -184,7 +184,34 @@ function papersToRIS(papers) {
     if (p.journal) lines.push(`JO  - ${p.journal}`);
     if (p.doi) lines.push(`DO  - ${p.doi}`);
     if (p.abstract) lines.push(`AB  - ${p.abstract}`);
+    if (p.sourceUrl) lines.push(`UR  - ${p.sourceUrl}`);
+    if (p.fullTextUrl) lines.push(`L1  - ${p.fullTextUrl}`);
+    if (p.source) lines.push(`DB  - ${p.source}`);
+    const statusLabels = { included: 'Included', excluded: 'Excluded', pending: 'Pending review', unscreened: 'Not screened' };
+    const noteBits = [`Screening status: ${statusLabels[p.status] || p.status}`];
+    if (p.aiReason) noteBits.push(`AI summary: ${p.aiReason}`);
+    lines.push(`N1  - ${noteBits.join(' | ')}`);
     lines.push('ER  - ');
     return lines.join('\n');
+  }).join('\n\n');
+}
+
+// ===== خروجی BibTeX =====
+function papersToBibTeX(papers) {
+  const slugify = (p, i) => {
+    const authorPart = (p.author || 'unknown').split(/\s+/)[0].replace(/[^a-zA-Z0-9]/g, '') || 'unknown';
+    return `${authorPart}${p.year || ''}_${i}`.toLowerCase();
+  };
+  const esc = s => (s || '').replace(/[{}]/g, '');
+  return papers.map((p, i) => {
+    const fields = [];
+    if (p.author) fields.push(`  author = {${esc(p.author.replace(' et al.', ''))}}`);
+    if (p.title) fields.push(`  title = {${esc(p.title)}}`);
+    if (p.journal) fields.push(`  journal = {${esc(p.journal)}}`);
+    if (p.year) fields.push(`  year = {${p.year}}`);
+    if (p.doi) fields.push(`  doi = {${p.doi}}`);
+    if (p.sourceUrl) fields.push(`  url = {${p.sourceUrl}}`);
+    if (p.abstract) fields.push(`  abstract = {${esc(p.abstract)}}`);
+    return `@article{${slugify(p, i)},\n${fields.join(',\n')}\n}`;
   }).join('\n\n');
 }

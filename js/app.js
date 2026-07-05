@@ -58,6 +58,7 @@ function initNavigation() {
 }
 
 const tabTitles = {
+  autosearch: 'جستجوی خودکار',
   strategy: 'استراتژی جستجو',
   screen: 'غربال‌گری AI',
   papers: 'مدیریت مقالات',
@@ -279,7 +280,7 @@ async function screenPaper() {
     let result;
     try {
       const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      result = JSON.parse(cleaned);
+      result = applyConfidenceGate(JSON.parse(cleaned));
     } catch {
       throw new Error('پاسخ AI قابل تجزیه نبود');
     }
@@ -337,7 +338,26 @@ function buildResultHTML(result, paper) {
     `<div style="padding:4px 0;border-bottom:1px solid var(--border);font-size:12px">• ${f}</div>`
   ).join('');
 
+  const metaBits = [
+    paper.author,
+    paper.year,
+    paper.journal,
+    paper.doi ? `DOI: ${paper.doi}` : '',
+    paper.source ? `منبع: ${paper.source}` : ''
+  ].filter(Boolean).join(' • ');
+
+  // خلاصه کامل مقاله (عنوان + چکیده + سایر مشخصات) — تا تصمیم‌گیرنده مجبور نباشد اسکرول کند
+  const paperSummaryHTML = `
+    <div class="paper-summary-box">
+      <div class="ps-title">${paper.title}</div>
+      ${metaBits ? `<div class="ps-meta">${metaBits}</div>` : ''}
+      ${paper.abstract ? `<div class="ps-abstract">${paper.abstract}</div>` : `<div class="ps-abstract" style="opacity:.6">(چکیده‌ای ثبت نشده — تصمیم فقط بر اساس عنوان است)</div>`}
+      ${paper.sourceUrl ? `<div style="margin-top:8px"><a href="${paper.sourceUrl}" target="_blank" rel="noopener" style="color:var(--accent2);font-size:12px">مشاهده مقاله اصلی ↗</a></div>` : ''}
+    </div>
+  `;
+
   return `
+    ${paperSummaryHTML}
     <div class="verdict-box ${d.class}">
       <div class="verdict-icon">${d.icon}</div>
       <div class="verdict-text">
@@ -397,6 +417,7 @@ function addManual() {
   }
 
   STATE.papers.push(paper);
+  logPrismaIdentified('other', 1);
   saveToStorage();
   updatePaperBadge();
   clearScreenForm();
@@ -451,6 +472,8 @@ function parseBatch() {
     added++;
   });
 
+  logPrismaIdentified('other', parsedPapers.length);
+  logPrismaDuplicates(exactDupes + fuzzyDupes);
   saveToStorage();
   updatePaperBadge();
   document.getElementById('batchInput').value = '';
@@ -552,7 +575,7 @@ function renderPapers() {
     tbody.innerHTML = filtered.map(p => `
       <tr>
         <td class="paper-title-cell">
-          <div class="title" title="${p.title}">${p.title}</div>
+          <div class="title" title="کلیک برای مشاهده جزئیات کامل" style="cursor:pointer" onclick="openPaperDetail(${p.id})">${p.title}${p.source ? `<span class="source-badge">${p.source}</span>` : ''}${p.fullTextUrl ? `<span class="source-badge" style="background:var(--green-bg);color:var(--green)">🔓 OA</span>` : ''}</div>
           ${p.doi ? `<div class="doi">${p.doi}</div>` : ''}
         </td>
         <td>${p.author || '—'}</td>
@@ -561,6 +584,7 @@ function renderPapers() {
         <td><div class="ai-reason" title="${p.aiReason || ''}">${p.aiReason || '—'}</div></td>
         <td>
           <div class="action-btns">
+            <button class="action-btn" onclick="openPaperDetail(${p.id})" title="جزئیات کامل (عنوان، چکیده، تاریخ و استدلال AI)">👁</button>
             <button class="action-btn" onclick="changeStatus(${p.id}, 'included')" title="شامل">✅</button>
             <button class="action-btn" onclick="changeStatus(${p.id}, 'excluded')" title="خارج">❌</button>
             <button class="action-btn" onclick="changeStatus(${p.id}, 'pending')" title="در بررسی">⏳</button>
@@ -618,6 +642,105 @@ function updatePaperBadge() {
   badge.style.display = n > 0 ? 'inline-block' : 'none';
   badge.textContent = n;
   updateUnscreenedCount();
+}
+
+// ===== جزئیات کامل مقاله (برای تصمیم دستی دقیق) =====
+function openPaperDetail(id) {
+  const p = STATE.papers.find(x => x.id === id);
+  if (!p) return;
+
+  const r = p.aiResult;
+  const confMap = { high: 'بالا', medium: 'متوسط', low: 'پایین' };
+  const picoLabels = { population: 'جمعیت (P)', intervention: 'مداخله (I)', comparison: 'مقایسه (C)', outcome: 'پیامد (O)' };
+  const matchLabels = { match: '✅ مطابق', mismatch: '❌ نامطابق', unclear: '❓ نامشخص', 'n/a': '— ندارد' };
+
+  const metaChips = [
+    p.author ? `نویسنده: ${p.author}` : '',
+    p.year ? `سال: ${p.year}` : '',
+    p.journal ? `مجله: ${p.journal}` : '',
+    p.doi ? `DOI: ${p.doi}` : '',
+    p.source ? `منبع: ${p.source}` : '',
+    `وضعیت: ${statusLabel(p.status)}`
+  ].filter(Boolean).map(t => `<span>${t}</span>`).join('');
+
+  const picoHTML = r?.picoMatch ? `
+    <div class="modal-section">
+      <div class="modal-section-title">تطابق PICO</div>
+      ${Object.entries(r.picoMatch).map(([k, v]) => `<div style="font-size:12.5px;padding:3px 0">${picoLabels[k] || k}: ${matchLabels[v] || v}</div>`).join('')}
+    </div>` : '';
+
+  const criteriaHTML = (r?.criteriaCheck || []).map(c => {
+    const icons = { pass: '✅', fail: '❌', unknown: '❓' };
+    return `<div style="font-size:12.5px;padding:4px 0;border-bottom:1px solid var(--border)">${icons[c.status] || '❓'} <strong>${c.criterion}</strong> — ${c.reason}</div>`;
+  }).join('');
+
+  document.getElementById('paperDetailContent').innerHTML = `
+    <div class="modal-title">${p.title}</div>
+    <div class="modal-meta-row">${metaChips}</div>
+
+    <div class="modal-section">
+      <div class="modal-section-title">چکیده</div>
+      <div class="modal-abstract">${p.abstract || '(چکیده‌ای برای این مقاله ثبت نشده)'}</div>
+    </div>
+
+    ${p.sourceUrl ? `<div class="modal-section"><a href="${p.sourceUrl}" target="_blank" rel="noopener" style="color:var(--accent2);font-size:13px">مشاهده مقاله اصلی ↗</a></div>` : ''}
+
+    <div class="modal-section" id="fullTextSection-${p.id}">
+      ${p.fullTextUrl
+        ? `<a href="${p.fullTextUrl}" target="_blank" rel="noopener" class="btn-primary" style="display:inline-block;text-decoration:none">🔓 باز کردن متن‌کامل رایگان (${p.oaStatus || 'OA'}) ↗</a>`
+        : `<button class="btn-ghost" onclick="lookupSinglePaperFullText(${p.id})">🔓 جستجوی متن‌کامل رایگان (Unpaywall)</button>
+           ${p.fullTextNote ? `<div style="font-size:11.5px;color:var(--text3);margin-top:6px">${p.fullTextNote}</div>` : ''}`
+      }
+    </div>
+
+    ${r ? `
+    <div class="modal-section">
+      <div class="modal-section-title">نتیجه غربال‌گری AI</div>
+      <div style="font-size:13px">تصمیم: <strong>${statusLabel(r.decision)}</strong> — اطمینان: ${confMap[r.confidence] || r.confidence || '—'} (${r.confidenceScore ?? '?'}%)</div>
+      ${r.summary ? `<div style="font-size:12.5px;color:var(--text2);margin-top:4px">${r.summary}</div>` : ''}
+    </div>
+    ${r.reasoning ? `
+    <div class="modal-section">
+      <div class="modal-section-title">استدلال کامل AI</div>
+      <div style="font-size:12.5px;color:var(--text2);line-height:1.8;background:var(--bg3);padding:10px;border-radius:8px">${r.reasoning}</div>
+    </div>` : ''}
+    ${picoHTML}
+    ${criteriaHTML ? `<div class="modal-section"><div class="modal-section-title">بررسی معیارها</div>${criteriaHTML}</div>` : ''}
+    ` : `<div class="modal-section" style="color:var(--text3);font-size:12.5px">این مقاله هنوز با AI غربال نشده است.</div>`}
+
+    <div class="result-actions" style="margin-top:16px">
+      <button class="btn-primary" style="flex:1" onclick="changeStatus(${p.id}, 'included'); closePaperDetail();">✅ تأیید ورود</button>
+      <button class="btn-ghost" style="flex:1" onclick="changeStatus(${p.id}, 'excluded'); closePaperDetail();">❌ خروج</button>
+      <button class="btn-ghost" onclick="changeStatus(${p.id}, 'pending'); closePaperDetail();">⏳ در بررسی</button>
+    </div>
+  `;
+
+  document.getElementById('paperDetailModal').style.display = 'flex';
+}
+
+function closePaperDetail() {
+  document.getElementById('paperDetailModal').style.display = 'none';
+}
+
+async function lookupSinglePaperFullText(id) {
+  const p = STATE.papers.find(x => x.id === id);
+  if (!p) return;
+  const section = document.getElementById(`fullTextSection-${p.id}`);
+  if (section) section.innerHTML = '<span class="spinner" style="width:16px;height:16px"></span> در حال جستجو در Unpaywall...';
+
+  const result = await findOpenAccessPdf(p.doi);
+  if (result.found) {
+    p.fullTextUrl = result.url;
+    p.oaStatus = result.oaStatus;
+  } else {
+    p.fullTextNote = result.reason;
+  }
+  saveToStorage();
+  if (section) {
+    section.innerHTML = p.fullTextUrl
+      ? `<a href="${p.fullTextUrl}" target="_blank" rel="noopener" class="btn-primary" style="display:inline-block;text-decoration:none">🔓 باز کردن متن‌کامل رایگان (${p.oaStatus || 'OA'}) ↗</a>`
+      : `<button class="btn-ghost" onclick="lookupSinglePaperFullText(${p.id})">🔓 جستجوی متن‌کامل رایگان (Unpaywall)</button><div style="font-size:11.5px;color:var(--text3);margin-top:6px">${p.fullTextNote}</div>`;
+  }
 }
 
 // ===== Update Tab =====
@@ -723,58 +846,82 @@ function renderPrismaFlow() {
   const unscreened = STATE.papers.filter(p => p.status === 'unscreened').length;
   const screened = total - unscreened;
 
-  const svg = buildPrismaSVG({ total, screened, excluded, included, pending });
+  const prisma = STATE.prisma || { identifiedBySource: {}, identifiedOther: 0, duplicatesRemoved: 0 };
+  const bySource = Object.entries(prisma.identifiedBySource || {});
+  const identifiedRaw = bySource.reduce((s, [, c]) => s + c, 0) + (prisma.identifiedOther || 0);
+  const duplicatesRemoved = prisma.duplicatesRemoved || 0;
+
+  const svg = buildPrismaSVG({
+    bySource, identifiedOther: prisma.identifiedOther || 0, identifiedRaw, duplicatesRemoved,
+    total, screened, excluded, included, pending
+  });
   document.getElementById('prismaFlow').innerHTML = svg;
 }
 
-function buildPrismaSVG({ total, screened, excluded, included, pending }) {
-  const W = 380, boxW = 300, boxH = 56, gap = 36, x = (W - boxW) / 2;
-  const sideBoxW = 130;
+function buildPrismaSVG({ bySource, identifiedOther, identifiedRaw, duplicatesRemoved, total, screened, excluded, included, pending }) {
+  const W = 400, boxW = 320, x = (W - boxW) / 2;
+  const sideBoxW = 150;
   const fullW = W + sideBoxW + 24;
   let y = 16;
   const boxes = [];
   const arrows = [];
 
-  function box(label, value, color, sub) {
+  function box(label, value, color, sub, extraH) {
+    const h = 56 + (extraH || 0);
     boxes.push(`
-      <rect x="${x}" y="${y}" width="${boxW}" height="${boxH}" rx="8" fill="var(--bg3)" stroke="${color}" stroke-width="1.6"/>
-      <text x="${x + 14}" y="${y + 23}" font-size="12" fill="var(--text2)" font-family="Vazirmatn, sans-serif" text-anchor="start" direction="ltr">${label}</text>
-      <text x="${x + 14}" y="${y + 44}" font-size="17" font-weight="700" fill="var(--text)" font-family="Vazirmatn, sans-serif" text-anchor="start" direction="ltr">${value} ${sub || ''}</text>
+      <rect x="${x}" y="${y}" width="${boxW}" height="${h}" rx="8" fill="var(--bg3)" stroke="${color}" stroke-width="1.6"/>
+      <text x="${x + 14}" y="${y + 20}" font-size="11.5" fill="var(--text2)" font-family="Vazirmatn, sans-serif" text-anchor="start" direction="ltr">${label}</text>
+      <text x="${x + 14}" y="${y + 41}" font-size="17" font-weight="700" fill="var(--text)" font-family="Vazirmatn, sans-serif" text-anchor="start" direction="ltr">${value}</text>
+      ${sub ? `<text x="${x + 14}" y="${y + h - 8}" font-size="10.5" fill="var(--text3)" font-family="Vazirmatn, sans-serif" text-anchor="start" direction="ltr">${sub}</text>` : ''}
     `);
     const startY = y;
-    y += boxH;
+    y += h;
     return startY;
   }
 
-  function arrow() {
-    arrows.push(`<line x1="${W/2}" y1="${y}" x2="${W/2}" y2="${y + gap - 6}" stroke="var(--border2)" stroke-width="1.6" marker-end="url(#arrowhead)"/>`);
-    y += gap;
+  function arrow(gap) {
+    const g = gap || 34;
+    arrows.push(`<line x1="${W/2}" y1="${y}" x2="${W/2}" y2="${y + g - 6}" stroke="var(--border2)" stroke-width="1.6" marker-end="url(#arrowhead)"/>`);
+    y += g;
   }
 
-  box('شناسایی (Identification)', total, 'var(--accent)', 'مقاله از همه دیتابیس‌ها');
+  // === مرحله شناسایی — تفکیک واقعی به‌ازای هر دیتابیس (نه یک عدد جعلی) ===
+  const sourceLines = bySource.map(([name, count]) => `${name}: ${count}`);
+  if (identifiedOther) sourceLines.push(`دستی/Import: ${identifiedOther}`);
+  const sourceSub = sourceLines.length ? sourceLines.join(' • ') : 'هنوز جستجویی ثبت نشده';
+  box('شناسایی (Identification) — مجموع خام از همه منابع', identifiedRaw, 'var(--accent)', sourceSub, sourceLines.length ? 18 : 0);
   arrow();
-  box('بعد از حذف داپلیکیت', total, 'var(--accent)', 'مقاله برای غربال‌گری');
+
+  const dedupY = y;
+  box('منحصر‌به‌فرد پس از حذف داپلیکیت', total, 'var(--accent)', `${duplicatesRemoved} داپلیکیت حذف شد`);
   arrow();
+
   const screeningY = y;
-  box('غربال‌گری عنوان/چکیده', screened, 'var(--text3)', `از ${total} مقاله`);
+  box('غربال‌گری عنوان/چکیده انجام‌شده', screened, 'var(--text3)', `از ${total} رکورد منحصربه‌فرد`);
   arrow();
-  box('شامل نهایی (Included)', included, 'var(--green)', 'مقاله در رویو');
+  box('شامل نهایی (Included)', included, 'var(--green)', 'مقاله در رویو نهایی');
 
   const totalH = y + 10;
-  const excludeBoxY = screeningY;
   const sideBoxX = x + boxW + 24;
 
+  const dupSide = duplicatesRemoved ? `
+    <line x1="${x + boxW}" y1="${dedupY + 28}" x2="${sideBoxX}" y2="${dedupY + 28}" stroke="var(--amber)" stroke-width="1.4" marker-end="url(#arrowhead-amber)"/>
+    <rect x="${sideBoxX}" y="${dedupY}" width="${sideBoxW}" height="56" rx="8" fill="var(--amber-bg)" stroke="var(--amber)" stroke-width="1.4"/>
+    <text x="${sideBoxX + 10}" y="${dedupY + 21}" font-size="10.5" fill="var(--amber)" font-family="Vazirmatn, sans-serif" text-anchor="start" direction="ltr">داپلیکیت حذف‌شده</text>
+    <text x="${sideBoxX + 10}" y="${dedupY + 42}" font-size="16" font-weight="700" fill="var(--amber)" font-family="Vazirmatn, sans-serif" text-anchor="start" direction="ltr">${duplicatesRemoved}</text>
+  ` : '';
+
   const sideExclude = `
-    <line x1="${x + boxW}" y1="${excludeBoxY + boxH/2}" x2="${sideBoxX}" y2="${excludeBoxY + boxH/2}" stroke="var(--red)" stroke-width="1.4" marker-end="url(#arrowhead-red)"/>
-    <rect x="${sideBoxX}" y="${excludeBoxY}" width="${sideBoxW}" height="${boxH}" rx="8" fill="var(--red-bg)" stroke="var(--red)" stroke-width="1.4"/>
-    <text x="${sideBoxX + 10}" y="${excludeBoxY + 21}" font-size="10.5" fill="var(--red)" font-family="Vazirmatn, sans-serif" text-anchor="start" direction="ltr">خارج شده</text>
-    <text x="${sideBoxX + 10}" y="${excludeBoxY + 42}" font-size="16" font-weight="700" fill="var(--red)" font-family="Vazirmatn, sans-serif" text-anchor="start" direction="ltr">${excluded}</text>
+    <line x1="${x + boxW}" y1="${screeningY + 28}" x2="${sideBoxX}" y2="${screeningY + 28}" stroke="var(--red)" stroke-width="1.4" marker-end="url(#arrowhead-red)"/>
+    <rect x="${sideBoxX}" y="${screeningY}" width="${sideBoxW}" height="56" rx="8" fill="var(--red-bg)" stroke="var(--red)" stroke-width="1.4"/>
+    <text x="${sideBoxX + 10}" y="${screeningY + 21}" font-size="10.5" fill="var(--red)" font-family="Vazirmatn, sans-serif" text-anchor="start" direction="ltr">خارج شده (Excluded)</text>
+    <text x="${sideBoxX + 10}" y="${screeningY + 42}" font-size="16" font-weight="700" fill="var(--red)" font-family="Vazirmatn, sans-serif" text-anchor="start" direction="ltr">${excluded}</text>
   `;
 
   const pendingBadge = pending ? `
-    <rect x="${sideBoxX}" y="${excludeBoxY + boxH + 10}" width="${sideBoxW}" height="${boxH}" rx="8" fill="var(--amber-bg)" stroke="var(--amber)" stroke-width="1.4"/>
-    <text x="${sideBoxX + 10}" y="${excludeBoxY + boxH + 31}" font-size="10.5" fill="var(--amber)" font-family="Vazirmatn, sans-serif" text-anchor="start" direction="ltr">در انتظار بررسی</text>
-    <text x="${sideBoxX + 10}" y="${excludeBoxY + boxH + 52}" font-size="16" font-weight="700" fill="var(--amber)" font-family="Vazirmatn, sans-serif" text-anchor="start" direction="ltr">${pending}</text>
+    <rect x="${sideBoxX}" y="${screeningY + 66}" width="${sideBoxW}" height="56" rx="8" fill="var(--amber-bg)" stroke="var(--amber)" stroke-width="1.4"/>
+    <text x="${sideBoxX + 10}" y="${screeningY + 87}" font-size="10.5" fill="var(--amber)" font-family="Vazirmatn, sans-serif" text-anchor="start" direction="ltr">در انتظار بررسی</text>
+    <text x="${sideBoxX + 10}" y="${screeningY + 108}" font-size="16" font-weight="700" fill="var(--amber)" font-family="Vazirmatn, sans-serif" text-anchor="start" direction="ltr">${pending}</text>
   ` : '';
 
   return `
@@ -782,9 +929,11 @@ function buildPrismaSVG({ total, screened, excluded, included, pending }) {
       <defs>
         <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--border2)"/></marker>
         <marker id="arrowhead-red" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--red)"/></marker>
+        <marker id="arrowhead-amber" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--amber)"/></marker>
       </defs>
       ${boxes.join('')}
       ${arrows.join('')}
+      ${dupSide}
       ${sideExclude}
       ${pendingBadge}
     </svg>
@@ -816,6 +965,11 @@ function renderStrategyReport() {
   const inc = s.inclusion.map(c => `- [${c.type}] ${c.value}`).join('\n') || 'تعریف نشده';
   const exc = s.exclusion.map(c => `- [${c.type}] ${c.value}`).join('\n') || 'تعریف نشده';
 
+  const prisma = STATE.prisma || { identifiedBySource: {}, identifiedOther: 0, duplicatesRemoved: 0 };
+  const dbLines = Object.entries(prisma.identifiedBySource || {}).map(([name, count]) => `- ${name}: ${count} رکورد`);
+  if (prisma.identifiedOther) dbLines.push(`- افزوده‌شده دستی / Import: ${prisma.identifiedOther} رکورد`);
+  const dbSection = dbLines.length ? dbLines.join('\n') : '(هنوز جستجوی خودکاری ثبت نشده)';
+
   document.getElementById('strategyReport').textContent =
 `Search Strategy Report
 Generated: ${new Date().toLocaleDateString('fa-IR')}
@@ -823,12 +977,13 @@ Generated: ${new Date().toLocaleDateString('fa-IR')}
 === Keywords ===
 ${kws}
 
-=== Search Databases ===
-- PubMed/MEDLINE
-- Scopus
-- Web of Science
-- Semantic Scholar (free)
-- Google Scholar
+=== Databases Actually Searched (real counts, logged automatically) ===
+${dbSection}
+Duplicates removed: ${prisma.duplicatesRemoved || 0}
+
+Note: Scopus / Web of Science / Embase require institutional API keys and were not
+queried automatically by this tool (browser-side CORS restrictions) — check the
+"آپدیت دوره‌ای" tab for ready-made manual search links for these databases.
 
 === Date Range ===
 ${s.yearFrom || 'no limit'} to ${s.yearTo || 'present'}
@@ -843,7 +998,7 @@ ${inc}
 ${exc}
 
 === Results ===
-Total identified: ${STATE.papers.length}
+Total unique records screened: ${STATE.papers.length}
 Included: ${STATE.papers.filter(p=>p.status==='included').length}
 Excluded: ${STATE.papers.filter(p=>p.status==='excluded').length}
 Pending: ${STATE.papers.filter(p=>p.status==='pending').length}`;
@@ -894,6 +1049,73 @@ function exportRIS() {
   a.download = `systematic_review_${new Date().toISOString().split('T')[0]}.ris`;
   a.click();
   showToast('✅ فایل RIS دانلود شد — قابل وارد کردن در Zotero/EndNote', 'success');
+}
+
+function exportBibTeX() {
+  if (!STATE.papers.length) { showToast('⚠ مقاله‌ای وجود ندارد', 'error'); return; }
+  const bib = papersToBibTeX(STATE.papers);
+  const blob = new Blob([bib], { type: 'application/x-bibtex' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `systematic_review_${new Date().toISOString().split('T')[0]}.bib`;
+  a.click();
+  showToast('✅ فایل BibTeX دانلود شد', 'success');
+}
+
+// ===== خروجی Excel واقعی (چند شیت: همه مقالات + شامل‌شده‌ها + آمار PRISMA) با SheetJS =====
+function exportExcel() {
+  if (!STATE.papers.length) { showToast('⚠ مقاله‌ای وجود ندارد', 'error'); return; }
+  if (typeof XLSX === 'undefined') { showToast('❌ کتابخانه Excel لود نشد — اتصال اینترنت را چک کنید', 'error'); return; }
+
+  const rowOf = p => ({
+    'عنوان': p.title || '',
+    'نویسنده': p.author || '',
+    'سال': p.year || '',
+    'مجله': p.journal || '',
+    'DOI': p.doi || '',
+    'منبع': p.source || '',
+    'وضعیت': statusLabel(p.status),
+    'اطمینان AI': p.aiResult?.confidence ? `${p.aiResult.confidence} (${p.aiResult.confidenceScore ?? '?'}%)` : '',
+    'خلاصه دلیل AI': p.aiReason || '',
+    'استدلال کامل AI': p.aiResult?.reasoning || '',
+    'چکیده': p.abstract || '',
+    'لینک': p.sourceUrl || '',
+    'PDF متن‌کامل رایگان': p.fullTextUrl || '',
+    'تاریخ افزوده‌شدن': p.addedAt ? new Date(p.addedAt).toLocaleDateString('fa-IR') : ''
+  });
+
+  const wb = XLSX.utils.book_new();
+
+  // شیت ۱: همه مقالات
+  const wsAll = XLSX.utils.json_to_sheet(STATE.papers.map(rowOf));
+  wsAll['!cols'] = [{ wch: 45 }, { wch: 18 }, { wch: 8 }, { wch: 22 }, { wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 35 }, { wch: 45 }, { wch: 50 }, { wch: 25 }, { wch: 25 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, wsAll, 'همه مقالات');
+
+  // شیت‌های تفکیکی بر اساس وضعیت
+  ['included', 'excluded', 'pending'].forEach(status => {
+    const rows = STATE.papers.filter(p => p.status === status).map(rowOf);
+    if (rows.length) {
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = wsAll['!cols'];
+      XLSX.utils.book_append_sheet(wb, ws, statusLabel(status));
+    }
+  });
+
+  // شیت آمار PRISMA
+  const prisma = STATE.prisma || { identifiedBySource: {}, identifiedOther: 0, duplicatesRemoved: 0 };
+  const prismaRows = Object.entries(prisma.identifiedBySource || {}).map(([source, count]) => ({ 'منبع': source, 'تعداد شناسایی‌شده': count }));
+  if (prisma.identifiedOther) prismaRows.push({ 'منبع': 'دستی / Import', 'تعداد شناسایی‌شده': prisma.identifiedOther });
+  prismaRows.push({ 'منبع': '— جمع کل شناسایی‌شده —', 'تعداد شناسایی‌شده': prismaRows.reduce((s, r) => s + r['تعداد شناسایی‌شده'], 0) });
+  prismaRows.push({ 'منبع': 'داپلیکیت حذف‌شده', 'تعداد شناسایی‌شده': prisma.duplicatesRemoved || 0 });
+  prismaRows.push({ 'منبع': 'منحصر‌به‌فرد برای غربال‌گری', 'تعداد شناسایی‌شده': STATE.papers.length });
+  prismaRows.push({ 'منبع': 'شامل نهایی', 'تعداد شناسایی‌شده': STATE.papers.filter(p => p.status === 'included').length });
+  prismaRows.push({ 'منبع': 'خارج‌شده', 'تعداد شناسایی‌شده': STATE.papers.filter(p => p.status === 'excluded').length });
+  const wsPrisma = XLSX.utils.json_to_sheet(prismaRows);
+  wsPrisma['!cols'] = [{ wch: 32 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, wsPrisma, 'آمار PRISMA');
+
+  XLSX.writeFile(wb, `systematic_review_${new Date().toISOString().split('T')[0]}.xlsx`);
+  showToast('✅ فایل Excel با چند شیت دانلود شد', 'success');
 }
 
 // ===== Toast =====
