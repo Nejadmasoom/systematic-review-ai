@@ -50,6 +50,30 @@ async function callAI(prompt, systemPrompt = '', options = {}) {
   return result.content;
 }
 
+// ===== fetch با retry خودکار روی 429 (رعایت دقیق rate limit به‌جای حدس زدن) =====
+async function fetchWithRetry(url, opts, maxRetries = 4) {
+  let attempt = 0;
+  while (true) {
+    const resp = await fetch(url, opts);
+    if (resp.status !== 429 || attempt >= maxRetries) return resp;
+    attempt++;
+
+    let waitMs = 2500 * attempt; // fallback نمایی اگر هدر نبود
+    const retryAfter = resp.headers.get('retry-after');
+    if (retryAfter && !isNaN(parseFloat(retryAfter))) {
+      waitMs = Math.ceil(parseFloat(retryAfter) * 1000) + 250;
+    } else {
+      try {
+        const body = await resp.clone().json();
+        const msg = body?.error?.message || '';
+        const match = msg.match(/try again in ([\d.]+)s/i);
+        if (match) waitMs = Math.ceil(parseFloat(match[1]) * 1000) + 250;
+      } catch (e) { /* بدنه JSON نبود، از fallback نمایی استفاده کن */ }
+    }
+    await new Promise(r => setTimeout(r, waitMs));
+  }
+}
+
 async function callOpenAICompat(prompt, systemPrompt, key, options = {}) {
   const baseUrl = STATE.baseUrls.openai || 'https://api.openai.com/v1';
   const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
@@ -69,7 +93,7 @@ async function callOpenAICompat(prompt, systemPrompt, key, options = {}) {
     temperature: options.temperature ?? 0.1
   };
 
-  const resp = await fetch(finalUrl, {
+  const resp = await fetchWithRetry(finalUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -80,6 +104,7 @@ async function callOpenAICompat(prompt, systemPrompt, key, options = {}) {
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
+    if (resp.status === 429) throw new Error(`محدودیت نرخ (rate limit) — ${err.error?.message || 'حتی بعد از چند تلاش مجدد هم رد نشد، کمی صبر کنید'}`);
     throw new Error(err.error?.message || `خطای HTTP ${resp.status}`);
   }
 
@@ -104,7 +129,7 @@ async function callGemini(prompt, systemPrompt, key, options = {}) {
     }
   };
 
-  const resp = await fetch(url, {
+  const resp = await fetchWithRetry(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -112,6 +137,7 @@ async function callGemini(prompt, systemPrompt, key, options = {}) {
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
+    if (resp.status === 429) throw new Error(`محدودیت نرخ (rate limit) — ${err.error?.message || 'حتی بعد از چند تلاش مجدد هم رد نشد، کمی صبر کنید'}`);
     throw new Error(err.error?.message || `خطای HTTP ${resp.status}`);
   }
 
@@ -172,6 +198,23 @@ ${strategyText}
 }
 
 // ===== Screen Paper =====
+// ===== محافظت از Recall: طبق مطالعات اعتبارسنجی واقعی (مثلاً Research Synthesis Methods 2025)،
+// تصمیم "excluded" یک مدل AI به‌تنهایی می‌تواند حساسیت (sensitivity) فقط ۵۶ تا ۷۷ درصد داشته باشد —
+// یعنی تا ۴۵٪ از مقالات واقعاً مرتبط را ممکن است به‌اشتباه exclude کند. برای جلوگیری از این خطر،
+// هر تصمیم "excluded" که اطمینان AI پایین‌تر از آستانه باشد، به‌جای حذف قطعی به "pending" تبدیل
+// می‌شود تا حتماً یک انسان آن را ببیند (مطابق توصیه Cochrane برای عدم اتکای کامل به یک لایه غربال‌گری).
+function applyConfidenceGate(result) {
+  if (result.decision === 'excluded') {
+    const scoreOk = typeof result.confidenceScore === 'number' ? result.confidenceScore >= 85 : false;
+    if (result.confidence !== 'high' || !scoreOk) {
+      result.decision = 'pending';
+      result.gated = true;
+      result.summary = `[⚠ نیاز به بررسی انسانی — اطمینان AI برای exclude قطعی کافی نبود] ${result.summary || ''}`;
+    }
+  }
+  return result;
+}
+
 async function aiScreenPaper(paper, strategy) {
   const inclusionList = strategy.inclusion.map(c => `- [${c.type}] ${c.value}`).join('\n');
   const exclusionList = strategy.exclusion.map(c => `- [${c.type}] ${c.value}`).join('\n');
@@ -245,29 +288,47 @@ ${yearRange}
 }
 
 // ===== Batch Screening با محدودیت نرخ برای پلن‌های رایگان =====
-const FREE_TIER_DELAY_MS = { groq: 1300, gemini: 4200, openai: 300 };
+// این اعداد بر اساس محدودیت واقعی free-tier هر provider تنظیم شده‌اند (تیر ۱۴۰۵):
+// Groq free tier معمولاً حدود ۳۰ req/min برای اکثر مدل‌ها دارد → با کمی حاشیه امن، ۲.۵ ثانیه فاصله می‌گذاریم.
+const FREE_TIER_DELAY_MS = { groq: 2500, gemini: 4500, openai: 300 };
 
 async function screenPapersBatch(papers, strategy, onProgress, onPaperDone) {
-  const delay = FREE_TIER_DELAY_MS[STATE.activeProvider] || 500;
+  let delay = FREE_TIER_DELAY_MS[STATE.activeProvider] || 500;
   const results = [];
 
   for (let i = 0; i < papers.length; i++) {
     const paper = papers[i];
-    onProgress(i + 1, papers.length, paper.title);
+    onProgress(i + 1, papers.length, paper.title, delay);
 
-    try {
-      const raw = await aiScreenPaper(paper, strategy);
-      const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      const result = JSON.parse(cleaned);
-      paper.status = result.decision || 'pending';
-      paper.aiReason = result.summary || '';
-      paper.aiResult = result;
-      paper.screened = true;
-      results.push({ paper, result, error: null });
-    } catch (err) {
-      paper.status = 'unscreened';
-      paper.aiReason = `خطا: ${err.message}`;
-      results.push({ paper, result: null, error: err.message });
+    let attempt = 0;
+    let succeeded = false;
+
+    while (!succeeded) {
+      try {
+        const raw = await aiScreenPaper(paper, strategy);
+        const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const result = applyConfidenceGate(JSON.parse(cleaned));
+        paper.status = result.decision || 'pending';
+        paper.aiReason = result.summary || '';
+        paper.aiResult = result;
+        paper.screened = true;
+        results.push({ paper, result, error: null });
+        succeeded = true;
+      } catch (err) {
+        const isRateLimit = /rate limit|429|quota/i.test(err.message);
+        attempt++;
+        if (isRateLimit && attempt <= 3) {
+          // فاصله بین درخواست‌های بعدی را برای بقیه‌ی صف هم بیشتر کن تا دیگر به لیمیت نخوریم
+          delay = Math.min(delay * 1.8, 20000);
+          onProgress(i + 1, papers.length, `⏳ محدودیت نرخ خورد — افزایش فاصله به ${(delay / 1000).toFixed(1)} ثانیه، تلاش مجدد ${attempt}/3...`, delay);
+          await new Promise(r => setTimeout(r, delay));
+          continue; // همین مقاله را دوباره امتحان کن
+        }
+        paper.status = 'unscreened';
+        paper.aiReason = `خطا: ${err.message}`;
+        results.push({ paper, result: null, error: err.message });
+        succeeded = true; // از حلقه خارج شو، این مقاله رو نگه‌داشتیم برای بعد
+      }
     }
 
     onPaperDone(paper, results[results.length - 1]);
@@ -301,7 +362,7 @@ async function testConnection(provider) {
   STATE.apiKeys[provider] = key;
 
   // یک مدل ساده برای تست انتخاب کن
-  const testModels = { openai: 'gpt-4o-mini', gemini: 'gemini-1.5-flash-latest', groq: 'llama-3.1-8b-instant' };
+  const testModels = { openai: 'gpt-5.4-nano', gemini: 'gemini-3.1-flash-lite', groq: 'openai/gpt-oss-20b' };
   STATE.activeProvider = provider;
   STATE.activeModel = testModels[provider];
 
