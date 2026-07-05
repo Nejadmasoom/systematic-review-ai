@@ -1,94 +1,57 @@
 // models.js — تعریف مدل‌های هر provider
 
+// ⚠️ این لیست در تیر ۱۴۰۵ (ژوئیه ۲۰۲۶) به‌روزرسانی شد. مدل‌های هر provider مدام تغییر می‌کنند —
+// اگر مدلی خطای 404 / decommissioned داد، به مستندات رسمی provider مراجعه کنید:
+// OpenAI: platform.openai.com/docs/models | Gemini: ai.google.dev/gemini-api/docs/models | Groq: console.groq.com/docs/models
 const MODELS = {
+  // نکته مهم: این کلید API فقط برای OpenAI واقعی کار می‌کند مگر Base URL را روی یک پروکسی
+  // OpenAI-compatible (مثل OpenRouter) تغییر دهید. مدل‌های Claude/Gemini مستقیماً از طریق
+  // endpoint رسمی OpenAI قابل فراخوانی نیستند و از این لیست حذف شدند تا خطای گمراه‌کننده ندهند.
   openai: [
     {
-      id: 'gpt-4o',
-      name: 'GPT-4o',
-      desc: 'بهترین مدل OpenAI برای تحلیل علمی',
+      id: 'gpt-5.5',
+      name: 'GPT-5.5',
+      desc: 'پرچمدار فعلی OpenAI — بهترین دقت برای استدلال و تحلیل علمی پیچیده',
       badges: ['best'],
       recommended: true,
       provider: 'openai'
     },
     {
-      id: 'gpt-4o-mini',
-      name: 'GPT-4o Mini',
-      desc: 'سریع‌تر و ارزان‌تر، دقت خوب',
+      id: 'gpt-5.4-mini',
+      name: 'GPT-5.4 Mini',
+      desc: 'سریع‌تر و ارزان‌تر — دقت خوب برای غربال‌گری حجم بالا',
       badges: ['fast'],
       provider: 'openai'
     },
     {
-      id: 'gpt-4-turbo',
-      name: 'GPT-4 Turbo',
-      desc: 'Context window بزرگ ۱۲۸K',
-      badges: [],
-      provider: 'openai'
-    },
-    {
-      id: 'claude-sonnet-4-6',
-      name: 'Claude Sonnet 4.6',
-      desc: 'از طریق OpenAI API — عالی برای رویو',
-      badges: ['best'],
-      recommended: true,
-      provider: 'openai'
-    },
-    {
-      id: 'claude-opus-4-6',
-      name: 'Claude Opus 4.6',
-      desc: 'قوی‌ترین کلاد — تحلیل عمیق علمی',
-      badges: ['best'],
-      provider: 'openai'
-    },
-    {
-      id: 'claude-haiku-4-5',
-      name: 'Claude Haiku 4.5',
-      desc: 'سریع و مقرون‌به‌صرفه',
+      id: 'gpt-5.4-nano',
+      name: 'GPT-5.4 Nano',
+      desc: 'سبک‌ترین و ارزان‌ترین — مناسب پیش‌غربال‌گری سریع',
       badges: ['fast'],
-      provider: 'openai'
-    },
-    {
-      id: 'gemini-2.0-flash',
-      name: 'Gemini 2.0 Flash',
-      desc: 'از طریق OpenAI API',
-      badges: ['fast'],
-      provider: 'openai'
-    },
-    {
-      id: 'gemini-1.5-pro',
-      name: 'Gemini 1.5 Pro',
-      desc: 'Context بزرگ ۱M token',
-      badges: [],
       provider: 'openai'
     }
   ],
 
   gemini: [
     {
-      id: 'gemini-2.0-flash-exp',
-      name: 'Gemini 2.0 Flash',
-      desc: 'جدیدترین — سریع و دقیق',
-      badges: ['best', 'free'],
+      id: 'gemini-3.1-pro',
+      name: 'Gemini 3.1 Pro',
+      desc: 'قوی‌ترین مدل استدلال گوگل — Context یک میلیون توکن، مناسب تحلیل عمیق',
+      badges: ['best'],
       recommended: true,
       provider: 'gemini'
     },
     {
-      id: 'gemini-1.5-pro-latest',
-      name: 'Gemini 1.5 Pro',
-      desc: 'Context window یک میلیون توکن',
-      badges: ['free'],
+      id: 'gemini-3.5-flash',
+      name: 'Gemini 3.5 Flash',
+      desc: 'کیفیت نزدیک به Pro با سرعت و هزینه بسیار پایین‌تر — عالی برای غربال‌گری دسته‌ای',
+      badges: ['fast', 'best'],
       provider: 'gemini'
     },
     {
-      id: 'gemini-1.5-flash-latest',
-      name: 'Gemini 1.5 Flash',
-      desc: 'سریع‌ترین مدل Gemini',
-      badges: ['fast', 'free'],
-      provider: 'gemini'
-    },
-    {
-      id: 'gemini-1.5-flash-8b-latest',
-      name: 'Gemini 1.5 Flash 8B',
-      desc: 'سبک‌ترین — ارزان‌ترین',
+      id: 'gemini-3.1-flash-lite',
+      name: 'Gemini 3.1 Flash-Lite',
+      desc: 'ارزان‌ترین و سریع‌ترین مدل — برای حجم بسیار بالای مقالات',
       badges: ['fast', 'free'],
       provider: 'gemini'
     }
@@ -96,38 +59,31 @@ const MODELS = {
 
   groq: [
     {
-      id: 'llama-3.3-70b-versatile',
-      name: 'Llama 3.3 70B',
-      desc: '⭐ پیشنهاد برای سیستماتیک رویو — دقیق و رایگان',
+      id: 'openai/gpt-oss-120b',
+      name: 'GPT-OSS 120B (Groq)',
+      desc: '⭐ جایگزین رسمی Llama 3.3 70B (deprecated) — دقیق، رایگان و مناسب سیستماتیک رویو',
       badges: ['best', 'free'],
       recommended: true,
       provider: 'groq'
     },
     {
-      id: 'llama-3.1-8b-instant',
-      name: 'Llama 3.1 8B Instant',
-      desc: 'بسیار سریع — برای پیش‌غربال‌گری دسته‌ای',
+      id: 'openai/gpt-oss-20b',
+      name: 'GPT-OSS 20B (Groq)',
+      desc: 'جایگزین رسمی Llama 3.1 8B Instant (deprecated) — بسیار سریع برای پیش‌غربال‌گری',
       badges: ['fast', 'free'],
       provider: 'groq'
     },
     {
-      id: 'mixtral-8x7b-32768',
-      name: 'Mixtral 8x7B',
-      desc: 'Context window 32K — عالی برای abstract های طولانی',
+      id: 'qwen/qwen3.6-27b',
+      name: 'Qwen 3.6 27B (Groq)',
+      desc: 'مدل استدلال — مناسب قضاوت دقیق معیارهای PICO در موارد مبهم',
       badges: ['free'],
       provider: 'groq'
     },
     {
-      id: 'gemma2-9b-it',
-      name: 'Gemma 2 9B',
-      desc: 'مدل گوگل روی Groq',
-      badges: ['free'],
-      provider: 'groq'
-    },
-    {
-      id: 'deepseek-r1-distill-llama-70b',
-      name: 'DeepSeek R1 Distill 70B',
-      desc: 'مدل استدلال — برای قضاوت دقیق معیارها',
+      id: 'moonshotai/kimi-k2-instruct-0905',
+      name: 'Kimi K2 Instruct',
+      desc: 'Context window بزرگ — مناسب چکیده‌ها و متون طولانی',
       badges: ['free'],
       provider: 'groq'
     }
@@ -160,11 +116,19 @@ const STATE = {
     { id: 3, text: 'Scopus بررسی شد', done: false },
     { id: 4, text: 'Web of Science چک شد', done: false },
     { id: 5, text: 'Semantic Scholar بررسی شد', done: false },
-    { id: 6, text: 'snowballing از منابع مقالات انجام شد', done: false },
-    { id: 7, text: 'داپلیکیت‌ها با DOI حذف شدند', done: false },
-    { id: 8, text: 'غربال عنوان/چکیده انجام شد', done: false },
-    { id: 9, text: 'تاریخ جستجو ثبت شد', done: false }
-  ]
+    { id: 6, text: 'ClinicalTrials.gov برای کارآزمایی‌های ثبت‌شده/منتشرنشده چک شد', done: false },
+    { id: 7, text: 'چک Recall با چند مقاله شناخته‌شده انجام شد (استراتژی همه را پیدا کرد؟)', done: false },
+    { id: 8, text: 'snowballing از منابع مقالات انجام شد', done: false },
+    { id: 9, text: 'داپلیکیت‌ها با DOI حذف شدند', done: false },
+    { id: 10, text: 'غربال عنوان/چکیده انجام شد (با بررسی انسانی موارد pending)', done: false },
+    { id: 11, text: 'تاریخ جستجو ثبت شد', done: false }
+  ],
+  // ثبت دقیق منشأ رکوردها برای نمودار PRISMA واقعی (نه فقط شمارش نهایی بعد از dedup)
+  prisma: {
+    identifiedBySource: {}, // { 'PubMed': 42, 'OpenAlex': 118, ... } — مجموع تجمعی، قبل از حذف داپلیکیت
+    identifiedOther: 0,     // مقالات افزوده‌شده دستی یا از طریق Import دسته‌ای (خارج از جستجوی خودکار)
+    duplicatesRemoved: 0
+  }
 };
 
 function renderModelList(provider) {
@@ -177,10 +141,10 @@ function renderModelList(provider) {
       const labels = { best: '⭐ بهترین', fast: '⚡ سریع', free: '🆓 رایگان' };
       const classes = { best: 'badge-best', fast: 'badge-fast', free: 'badge-free' };
       return `<span class="model-item-badge ${classes[b]}">${labels[b]}</span>`;
-    }).join('');
+    }).join('') + (m.deprecated ? `<span class="model-item-badge badge-deprecated">⚠ روی سرور یافت نشد</span>` : '');
 
     return `
-      <div class="model-item ${isSelected ? 'selected' : ''}" onclick="selectModel('${provider}', '${m.id}')">
+      <div class="model-item ${isSelected ? 'selected' : ''} ${m.deprecated ? 'is-deprecated' : ''}" onclick="selectModel('${provider}', '${m.id}')" title="${m.deprecated ? 'این مدل با آخرین لیست دریافت‌شده از سرور مطابقت نداشت — احتمالاً منسوخ شده یا نام آن تغییر کرده' : ''}">
         <div style="flex:1">
           <div class="model-item-name">${m.name}</div>
           <div class="model-item-desc">${m.desc}</div>
@@ -189,6 +153,65 @@ function renderModelList(provider) {
       </div>
     `;
   }).join('');
+}
+
+// ===== بررسی زنده لیست مدل‌ها با provider (رفع قطعی مشکل "مطمئن نیستم منسوخ شده یا نه") =====
+const LIVE_MODELS = { openai: null, gemini: null, groq: null };
+
+function modelMatchesLive(modelId, liveIds) {
+  return liveIds.some(id => id === modelId || id.startsWith(modelId) || modelId.startsWith(id));
+}
+
+async function refreshModelsFromServer(provider) {
+  const keyInput = document.getElementById(`key${capitalize(provider)}`);
+  const key = (keyInput?.value || STATE.apiKeys[provider] || '').trim();
+  if (!key) { showToast('⚠ اول کلید API را در همین کارت وارد کنید', 'error'); return; }
+
+  const btn = document.getElementById(`refreshModels${capitalize(provider)}`);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ در حال دریافت از سرور...'; }
+
+  try {
+    let liveIds = [];
+
+    if (provider === 'gemini') {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      liveIds = (data.models || [])
+        .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+        .map(m => m.name.replace('models/', ''));
+
+    } else if (provider === 'groq') {
+      const resp = await fetch('https://api.groq.com/openai/v1/models', { headers: { Authorization: `Bearer ${key}` } });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      liveIds = (data.data || []).map(m => m.id);
+
+    } else if (provider === 'openai') {
+      const baseUrl = (document.getElementById('baseOpenai')?.value || '').trim() || 'https://api.openai.com/v1';
+      const resp = await fetch(`${baseUrl.replace(/\/$/, '')}/models`, { headers: { Authorization: `Bearer ${key}` } });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      liveIds = (data.data || []).map(m => m.id);
+    }
+
+    if (!liveIds.length) throw new Error('سرور لیست خالی برگرداند');
+
+    LIVE_MODELS[provider] = liveIds;
+    MODELS[provider].forEach(m => { m.deprecated = !modelMatchesLive(m.id, liveIds); });
+    renderModelList(provider);
+
+    const deprecatedCount = MODELS[provider].filter(m => m.deprecated).length;
+    if (deprecatedCount > 0) {
+      showToast(`⚠ ${deprecatedCount} مدل با سرور مطابقت نداشت (احتمالاً منسوخ) — با نشان قرمز مشخص شد`, 'error');
+    } else {
+      showToast(`✅ همه مدل‌های لیست‌شده روی سرور ${provider} فعال هستند`, 'success');
+    }
+  } catch (err) {
+    showToast(`❌ عدم دریافت لیست از سرور: ${err.message} (ممکن است کلید نامعتبر یا CORS مسدود باشد)`, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 بررسی زنده لیست مدل‌ها از سرور'; }
+  }
 }
 
 function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -221,6 +244,21 @@ function selectModel(provider, modelId) {
   if (typeof renderOnboardingBanner === 'function') renderOnboardingBanner();
 }
 
+// ثبت تعداد رکورد شناسایی‌شده از یک منبع (قبل از حذف داپلیکیت) — برای نمودار PRISMA دقیق
+function logPrismaIdentified(source, count) {
+  if (!STATE.prisma) STATE.prisma = { identifiedBySource: {}, identifiedOther: 0, duplicatesRemoved: 0 };
+  if (!count) return;
+  if (source === 'other') {
+    STATE.prisma.identifiedOther = (STATE.prisma.identifiedOther || 0) + count;
+  } else {
+    STATE.prisma.identifiedBySource[source] = (STATE.prisma.identifiedBySource[source] || 0) + count;
+  }
+}
+function logPrismaDuplicates(count) {
+  if (!STATE.prisma) STATE.prisma = { identifiedBySource: {}, identifiedOther: 0, duplicatesRemoved: 0 };
+  STATE.prisma.duplicatesRemoved = (STATE.prisma.duplicatesRemoved || 0) + (count || 0);
+}
+
 function saveToStorage() {
   try {
     localStorage.setItem('sysreview_state', JSON.stringify({
@@ -231,6 +269,7 @@ function saveToStorage() {
       papers: STATE.papers,
       strategy: STATE.strategy,
       checklist: STATE.checklist,
+      prisma: STATE.prisma,
       tokenUsage: STATE.tokenUsage
     }));
   } catch(e) {}
